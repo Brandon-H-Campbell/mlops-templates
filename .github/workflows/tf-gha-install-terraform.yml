@@ -93,10 +93,11 @@ jobs:
     - name: azure-login
       uses: azure/login@v2
       with:
-        client-id: ${{ secrets.clientId }}
-        client-secret: ${{ secrets.clientSecret }}
-        tenant-id: ${{ secrets.tenantId }}
-        subscription-id: ${{ secrets.subscriptionId }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        # client-id: ${{ secrets.clientId }}
+        # client-secret: ${{ secrets.clientSecret }}
+        # tenant-id: ${{ secrets.tenantId }}
+        # subscription-id: ${{ secrets.subscriptionId }}
         enable-AzPSSession: false
     - name: create-tfstate-resource-group
       run: |
