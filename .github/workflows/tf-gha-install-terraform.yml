@@ -91,25 +91,16 @@ jobs:
         shell: bash
     steps:
     - name: azure-login
-      uses: azure/login@v1
+      uses: azure/login@v2
       with:
-        creds: ${{ env.AZURE_CREDENTIALS }}
-        # environment: 'TBD' - default to azurecloud
-      env: 
-        AZURE_CREDENTIALS: ${{ secrets.azure_creds }}
+        client-id: ${{ secrets.clientId }}
+        tenant-id: ${{ secrets.tenantId }}
+        subscription-id: ${{ secrets.subscriptionId }}
+        enable-AzPSSession: false
     - name: create-tfstate-resource-group
-      uses: azure/CLI@v1
-      with:
-        azcliversion: 2.65.0
-        #
-        inlineScript: |
-          az account set -s ${{ env.ARM_SUBSCRIPTION_ID  }}
-          az group create --location ${{ inputs.terraform_st_location }} --name ${{ inputs.terraform_st_resource_group }}  
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}
+      run: |
+        az group create --location "${{ inputs.terraform_st_location }}" --name "${{ inputs.terraform_st_resource_group }}" --only-show-errors
+        echo "Resource group ensured: ${{ inputs.terraform_st_resource_group }}"
     - name: validate-azure-env
       run: |
         set -e
@@ -127,31 +118,26 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
         ARM_TENANT_ID: ${{ secrets.tenantId }}
     - name: create-tfstate-storage-account
-      uses: azure/CLI@v1
-      with:
-        azcliversion: 2.65.0
-        #
-        inlineScript: |
-          az account set -s ${{ env.ARM_SUBSCRIPTION_ID  }}
-          az storage account create -n ${{ inputs.terraform_st_storage_account }} -g ${{ inputs.terraform_st_resource_group }} -l ${{ inputs.terraform_st_location }} --sku Standard_LRS
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}    
+      run: |
+        if ! az storage account show -n "${{ inputs.terraform_st_storage_account }}" -g "${{ inputs.terraform_st_resource_group }}" &>/dev/null; then
+          az storage account create \
+            -n "${{ inputs.terraform_st_storage_account }}" \
+            -g "${{ inputs.terraform_st_resource_group }}" \
+            -l "${{ inputs.terraform_st_location }}" \
+            --sku Standard_LRS --kind StorageV2 --allow-blob-public-access false --only-show-errors
+          echo "Storage account created: ${{ inputs.terraform_st_storage_account }}"
+        else
+          echo "Storage account already exists, skipping create."
+        fi
     - name: create-tfstate-storage-container
-      uses: azure/CLI@v1
-      with:
-        azcliversion: 2.65.0
-        #
-        inlineScript: |
-          az account set -s ${{ env.ARM_SUBSCRIPTION_ID  }}
-          az storage container create --account-name ${{ inputs.terraform_st_storage_account }} --name ${{ inputs.terraform_st_container_name }}
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}    
+      run: |
+        # Use Azure AD auth; requires SP to have at least 'Storage Blob Data Contributor' on the storage account or RG.
+        if ! az storage container show --name "${{ inputs.terraform_st_container_name }}" --account-name "${{ inputs.terraform_st_storage_account }}" --auth-mode login &>/dev/null; then
+          az storage container create --name "${{ inputs.terraform_st_container_name }}" --account-name "${{ inputs.terraform_st_storage_account }}" --auth-mode login --only-show-errors
+          echo "Container created: ${{ inputs.terraform_st_container_name }}"
+        else
+          echo "Container already exists, skipping create."
+        fi
   install-terraform:
     name: 'Install Terraform'
     runs-on: ubuntu-latest
