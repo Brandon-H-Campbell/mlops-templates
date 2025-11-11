@@ -94,6 +94,7 @@ jobs:
       uses: azure/login@v2
       with:
         client-id: ${{ secrets.clientId }}
+        client-secret: ${{ secrets.clientSecret }}
         tenant-id: ${{ secrets.tenantId }}
         subscription-id: ${{ secrets.subscriptionId }}
         enable-AzPSSession: false
