@@ -44,7 +44,7 @@ on:
         type: string
         required: true
       terraform_st_location:
-        description: 'Terraform version'
+        description: 'Location of terraform state resources'
         type: string
         required: true
       terraform_st_storage_account: 
@@ -110,6 +110,22 @@ jobs:
         ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
         ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
         ARM_TENANT_ID: ${{ secrets.tenantId }}
+    - name: validate-azure-env
+      run: |
+        set -e
+        for v in ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_SUBSCRIPTION_ID ARM_TENANT_ID; do
+          if [ -z "${!v}" ]; then
+            echo "::error title=Missing secret::Environment variable $v is empty. Ensure secrets are passed from the caller workflow using 'secrets:' mapping.";
+            exit 1
+          fi
+        done
+        az account show >/dev/null || { echo "::error::Azure CLI not authenticated"; exit 1; }
+        echo "Azure authentication validated; subscription: $(az account show --query id -o tsv)"
+      env:
+        ARM_CLIENT_ID: ${{ secrets.clientId }}
+        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
+        ARM_TENANT_ID: ${{ secrets.tenantId }}
     - name: create-tfstate-storage-account
       uses: azure/CLI@v1
       with:
@@ -144,52 +160,34 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      ARM_CLIENT_ID: ${{ secrets.clientId }}
+      ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
+      ARM_TENANT_ID: ${{ secrets.tenantId }}
     steps:
     - name: checkout
       uses: actions/checkout@v3
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2 
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
     - name: Terraform Init
-      run: echo ${{ env.ARM_SUBSCRIPTION_ID }}; 
-        echo "all env:${{ env.ARM_CLIENT_ID }}::${{ env.ARM_SUBSCRIPTION_ID }}";
-        terraform -chdir=${{ inputs.terraform_workingdir }} init 
-        -backend-config='storage_account_name=${{ inputs.terraform_st_storage_account }}'
-        -backend-config='container_name=${{ inputs.terraform_st_container_name }}'
-        -backend-config='key=${{ inputs.terraform_st_key }}'         
-        -backend-config='resource_group_name=${{ inputs.terraform_st_resource_group }}';      
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}     
+      run: |
+        echo "Subscription: $ARM_SUBSCRIPTION_ID"
+        terraform -chdir=${{ inputs.terraform_workingdir }} init \
+          -backend-config="storage_account_name=${{ inputs.terraform_st_storage_account }}" \
+          -backend-config="container_name=${{ inputs.terraform_st_container_name }}" \
+          -backend-config="key=${{ inputs.terraform_st_key }}" \
+          -backend-config="resource_group_name=${{ inputs.terraform_st_resource_group }}"
     - name: Terraform Validate
       run: terraform -chdir=${{ inputs.terraform_workingdir }} validate
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}     
     - name: Terraform Plan
       run: terraform -chdir=${{ inputs.terraform_workingdir }} plan -out=plan.tfplan -input=false -var "location=${{ inputs.terraform_plan_location }}" -var "prefix=${{ inputs.namespace }}" -var "postfix=${{ inputs.postfix }}" -var "environment=${{ inputs.environment }}" 
         -var "enable_aml_computecluster=${{ inputs.enable_aml_computecluster }}" -var "enable_monitoring=${{ inputs.enable_monitoring }}" -var "client_secret=${{ env.ARM_CLIENT_SECRET }}"
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}     
     - name: Terraform Apply
       if: ${{ inputs.TFAction == 'apply'}}  
       run: terraform -chdir=${{ inputs.terraform_workingdir }} apply -input=false -auto-approve plan.tfplan 
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}     
     - name: Terraform Destroy
       if: ${{ inputs.TFAction == 'destroy' }} 
       run: terraform -chdir=${{ inputs.terraform_workingdir }} destroy -input=false -auto-approve
-      env:
-        ARM_CLIENT_ID: ${{ secrets.clientId }}
-        ARM_CLIENT_SECRET: ${{ secrets.clientSecret }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.subscriptionId }}
-        ARM_TENANT_ID: ${{ secrets.tenantId }}     
