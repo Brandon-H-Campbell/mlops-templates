@@ -100,7 +100,7 @@ jobs:
     - name: create-tfstate-resource-group
       uses: azure/CLI@v1
       with:
-        azcliversion: 2.30.0
+        azcliversion: 2.65.0
         #
         inlineScript: |
           az account set -s ${{ env.ARM_SUBSCRIPTION_ID  }}
@@ -113,7 +113,7 @@ jobs:
     - name: create-tfstate-storage-account
       uses: azure/CLI@v1
       with:
-        azcliversion: 2.30.0
+        azcliversion: 2.65.0
         #
         inlineScript: |
           az account set -s ${{ env.ARM_SUBSCRIPTION_ID  }}
@@ -126,7 +126,7 @@ jobs:
     - name: create-tfstate-storage-container
       uses: azure/CLI@v1
       with:
-        azcliversion: 2.30.0
+        azcliversion: 2.65.0
         #
         inlineScript: |
           az account set -s ${{ env.ARM_SUBSCRIPTION_ID  }}
