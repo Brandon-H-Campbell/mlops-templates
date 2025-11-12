@@ -71,6 +71,11 @@ on:
         type: string
         description: 'vnet of Terraform plan'
         required: true
+      terraform_upgrade:
+        type: boolean
+        description: 'Run terraform init with -upgrade to update provider plugins'
+        required: false
+        default: false
     secrets:
       AZURE_CREDENTIALS:
         required: true
@@ -164,7 +169,13 @@ jobs:
         # Initialize Terraform backend using Azure AD auth (no access keys / SAS) for state operations.
         # Requires that the service principal has 'Storage Blob Data Contributor' on the storage account.
         # 'use_azuread_auth=true' prevents Terraform from attempting key-based auth which is blocked by policy.
-        terraform -chdir=${{ inputs.terraform_workingdir }} init \
+        if [ "${{ inputs.terraform_upgrade }}" = "true" ]; then
+          echo "Running terraform init with -upgrade";
+          UPGRADE_FLAG="-upgrade"
+        else
+          UPGRADE_FLAG=""
+        fi
+        terraform -chdir=${{ inputs.terraform_workingdir }} init $UPGRADE_FLAG \
           -backend-config="storage_account_name=${{ inputs.terraform_st_storage_account }}" \
           -backend-config="container_name=${{ inputs.terraform_st_container_name }}" \
           -backend-config="key=${{ inputs.terraform_st_key }}" \
