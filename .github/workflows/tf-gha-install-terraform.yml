@@ -161,11 +161,14 @@ jobs:
     - name: Terraform Init
       run: |
         echo "Subscription: $ARM_SUBSCRIPTION_ID"
+        # Initialize Terraform backend using Azure AD auth (no access keys / SAS) for state operations.
+        # Requires that the service principal has 'Storage Blob Data Contributor' on the storage account.
+        # 'use_azuread_auth=true' prevents Terraform from attempting key-based auth which is blocked by policy.
         terraform -chdir=${{ inputs.terraform_workingdir }} init \
           -backend-config="storage_account_name=${{ inputs.terraform_st_storage_account }}" \
           -backend-config="container_name=${{ inputs.terraform_st_container_name }}" \
           -backend-config="key=${{ inputs.terraform_st_key }}" \
-          -backend-config="resource_group_name=${{ inputs.terraform_st_resource_group }}"
+          -backend-config="use_azuread_auth=true"
     - name: Terraform Validate
       run: terraform -chdir=${{ inputs.terraform_workingdir }} validate
     - name: Terraform Plan
