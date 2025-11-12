@@ -72,7 +72,7 @@ on:
         description: 'vnet of Terraform plan'
         required: true
     secrets:
-      azure_creds:
+      AZURE_CREDENTIALS:
         required: true
       clientId:
         required: true
@@ -93,6 +93,8 @@ jobs:
     - name: azure-login
       uses: azure/login@v2
       with:
+        # Secret is passed in by caller workflow via: secrets: AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        # Inside this reusable workflow it is available as secrets.AZURE_CREDENTIALS
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         enable-AzPSSession: false
     - name: create-tfstate-resource-group
